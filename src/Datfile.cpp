@@ -4,7 +4,8 @@ using namespace std;
 namespace fs = std::filesystem;
 
 #define add_e(x) x += (uintptr_t)datbuffer_e;
-#define getImAtOffset(im_ptr, offset) (image *)(*(&im_ptr + offset) + (uint64_t)(datbuffer_e));
+#define getImAtOffset(im_ptr, offset) (image *)(*(&im_ptr + offset) + (uintptr_t)(datbuffer_e));
+#define SPACING_BETWEEN_POINTS 0x20
 
 bool Datfile::convert(string filename)
 {
@@ -70,16 +71,17 @@ bool Datfile::DatToJson(string filename)
 
         Json::Value pointsJson(Json::arrayValue);
 
-        uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / 0x20;
-        Point *pointsPtr = (Point *)((uint64_t)(&imgs[i]->len2) + imgs[i]->distFromLen2ToFirstPoint);
+        uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / SPACING_BETWEEN_POINTS;
+        uint32_t *pointsPtr = (uint32_t *)((uint64_t)(&imgs[i]->len2) + imgs[i]->distFromLen2ToFirstPoint);
 
         for (uint32_t j = 0; j < numPnts; ++j)
         {
-            Json::Value currPoint;
-            currPoint["index"] = j;
-            currPoint["x"] = pointsPtr->x;
-            currPoint["y"] = pointsPtr->y;
-            pointsJson.append(currPoint);
+            Point *currPoint = (Point *)((uintptr_t)pointsPtr + j * SPACING_BETWEEN_POINTS);
+            Json::Value currPntJson;
+            currPntJson["index"] = j;
+            currPntJson["x"] = currPoint->x;
+            currPntJson["y"] = currPoint->y;
+            pointsJson.append(currPntJson);
         }
         currImg["points"] = pointsJson;
 
