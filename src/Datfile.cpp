@@ -53,6 +53,7 @@ bool Datfile::DatToJson(string filename)
     for (uint32_t i = 0; i < df->numImages; ++i)
     {
         Json::Value currImg;
+        currImg["index"] = i;
         currImg["colorR"] = imgs[i]->color.r;
         currImg["colorG"] = imgs[i]->color.g;
         currImg["colorB"] = imgs[i]->color.b;
@@ -65,7 +66,22 @@ bool Datfile::DatToJson(string filename)
         currImg["rotM10"] = imgs[i]->rotAndScale.m10;
         currImg["rotM11"] = imgs[i]->rotAndScale.m11;
 
-        currImg["twiceDistBetPnts"] = imgs[i]->twiceDistBetPnts;
+        currImg["twiceDistBetPnts"] = imgs[i]->distFromLen2ToFirstPoint;
+
+        Json::Value pointsJson(Json::arrayValue);
+
+        uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / 0x20;
+        Point *pointsPtr = (Point *)((uint64_t)(&imgs[i]->len2) + imgs[i]->distFromLen2ToFirstPoint);
+
+        for (uint32_t j = 0; j < numPnts; ++j)
+        {
+            Json::Value currPoint;
+            currPoint["index"] = j;
+            currPoint["x"] = pointsPtr->x;
+            currPoint["y"] = pointsPtr->y;
+            pointsJson.append(currPoint);
+        }
+        currImg["points"] = pointsJson;
 
         imgsJson.append(currImg);
     }

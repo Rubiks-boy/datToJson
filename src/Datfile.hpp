@@ -56,6 +56,12 @@ private:
         uint8_t a;
     };
 
+    struct Point
+    {
+        float x;
+        float y;
+    };
+
     struct image
     {
         uint32_t len;
@@ -68,9 +74,7 @@ private:
         RotAndScale rotAndScale;
         Ignore_2 consts0_2;
         uint32_t const2;
-        uint32_t twiceDistBetPnts;
-        uint32_t point0_x;
-        uint32_t point0_y;
+        uint32_t distFromLen2ToFirstPoint;
     };
 };
 
