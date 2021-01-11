@@ -6,6 +6,7 @@ namespace fs = std::filesystem;
 #define add_e(x) x += (uintptr_t)datbuffer_e;
 #define getImAtOffset(im_ptr, offset) (image *)(*(&im_ptr + offset) + (uintptr_t)(datbuffer_e));
 #define SPACING_BETWEEN_POINTS 0x20
+#define VERBOSE_POINTS 0
 
 bool Datfile::convert(string filename)
 {
@@ -69,21 +70,36 @@ bool Datfile::DatToJson(string filename)
 
         currImg["twiceDistBetPnts"] = imgs[i]->distFromLen2ToFirstPoint;
 
-        Json::Value pointsJson(Json::arrayValue);
-
-        uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / SPACING_BETWEEN_POINTS;
         uint32_t *pointsPtr = (uint32_t *)((uint64_t)(&imgs[i]->len2) + imgs[i]->distFromLen2ToFirstPoint);
 
-        for (uint32_t j = 0; j < numPnts; ++j)
+        if (VERBOSE_POINTS)
         {
-            Point *currPoint = (Point *)((uintptr_t)pointsPtr + j * SPACING_BETWEEN_POINTS);
-            Json::Value currPntJson;
-            currPntJson["index"] = j;
-            currPntJson["x"] = currPoint->x;
-            currPntJson["y"] = currPoint->y;
-            pointsJson.append(currPntJson);
+            Json::Value pointsJson(Json::arrayValue);
+
+            uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / SPACING_BETWEEN_POINTS;
+
+            for (uint32_t j = 0; j < numPnts; ++j)
+            {
+                Point *currPoint = (Point *)((uintptr_t)pointsPtr + j * SPACING_BETWEEN_POINTS);
+                Json::Value currPntJson;
+                currPntJson["index"] = j;
+                currPntJson["x"] = currPoint->x;
+                currPntJson["y"] = currPoint->y;
+                pointsJson.append(currPntJson);
+            }
+            currImg["points"] = pointsJson;
         }
-        currImg["points"] = pointsJson;
+        else
+        {
+            Json::Value points;
+            Point *topLeft = (Point *)((uintptr_t)pointsPtr + 1 * SPACING_BETWEEN_POINTS);
+            Point *bottomRight = (Point *)((uintptr_t)pointsPtr + 4 * SPACING_BETWEEN_POINTS);
+            points["x1"] = topLeft->x;
+            points["y1"] = topLeft->y;
+            points["x2"] = bottomRight->x;
+            points["y2"] = bottomRight->y;
+            currImg["points"] = points;
+        }
 
         imgsJson.append(currImg);
     }
