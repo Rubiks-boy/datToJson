@@ -56,17 +56,27 @@ bool Datfile::DatToJson(string filename)
     {
         Json::Value currImg;
         currImg["index"] = i;
-        currImg["colorR"] = imgs[i]->color.r;
-        currImg["colorG"] = imgs[i]->color.g;
-        currImg["colorB"] = imgs[i]->color.b;
-        currImg["colorA"] = imgs[i]->color.a;
+
+        Json::Value color;
+        color["red"] = imgs[i]->color.r;
+        color["green"] = imgs[i]->color.g;
+        color["blue"] = imgs[i]->color.b;
+        color["alpha"] = imgs[i]->color.a;
+        currImg["color"] = color;
 
         currImg["charId"] = imgs[i]->charId;
 
-        currImg["rotM00"] = imgs[i]->rotAndScale.m00;
-        currImg["rotM01"] = imgs[i]->rotAndScale.m01;
-        currImg["rotM10"] = imgs[i]->rotAndScale.m10;
-        currImg["rotM11"] = imgs[i]->rotAndScale.m11;
+        Json::Value scale;
+        scale["rotM00"] = imgs[i]->rotAndScale.m00;
+        scale["rotM01"] = imgs[i]->rotAndScale.m01;
+        scale["rotM10"] = imgs[i]->rotAndScale.m10;
+        scale["rotM11"] = imgs[i]->rotAndScale.m11;
+        currImg["rotAndScale"] = scale;
+
+        Json::Value offset;
+        offset["x"] = imgs[i]->initialOffset.x;
+        offset["y"] = imgs[i]->initialOffset.y;
+        currImg["initialOffset"] = offset;
 
         currImg["twiceDistBetPnts"] = imgs[i]->distFromLen2ToFirstPoint;
 
