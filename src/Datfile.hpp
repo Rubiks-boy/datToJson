@@ -72,7 +72,7 @@ private:
         uint32_t charId;
         Ignore_2 consts0_1;
         RotAndScale rotAndScale;
-        Ignore_2 consts0_2;
+        Point initialOffset;
         uint32_t const2;
         uint32_t distFromLen2ToFirstPoint;
     };
