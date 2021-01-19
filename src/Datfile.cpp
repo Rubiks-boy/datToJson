@@ -9,7 +9,7 @@ namespace fs = std::filesystem;
 #define IMAGE_HEADER_CONST 0x10
 #define VERBOSE_POINTS 1
 
-const int LEN_TO_FIRST_POINT[] = {64, 76, 72, 68};
+const int LEN_TO_FIRST_POINT[] = {0x40, 0x4C, 0x48, 0x44};
 
 bool Datfile::convert(string filename)
 {
@@ -91,17 +91,31 @@ bool Datfile::DatToJson(string filename)
             Json::Value pointsJson(Json::arrayValue);
 
             uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / SPACING_BETWEEN_POINTS;
-
-            for (uint32_t j = 0; j < numPnts; ++j)
+            uint32_t numShapes = numPnts / 3;
+            
+            for (uint32_t s = 0; s < numShapes; ++s)
             {
-                Point *currPoint = (Point *)((uintptr_t)pointsPtr + j * SPACING_BETWEEN_POINTS);
-                Json::Value currPntJson;
-                currPntJson["index"] = j;
-                currPntJson["x"] = currPoint->x;
-                currPntJson["y"] = currPoint->y;
-                pointsJson.append(currPntJson);
+                Json::Value currShape;
+                Json::Value currShapePts(Json::arrayValue);
+
+                currShape["index"] = s;
+
+                for (uint32_t j = 0; j < 3; ++j)
+                {
+                    uint32_t ptIndx = (s * 3) + j;
+                    Point *currPoint = (Point *)((uintptr_t)pointsPtr + ptIndx * SPACING_BETWEEN_POINTS);
+                    
+                    Json::Value currPntJson;
+                    currPntJson["index"] = j;
+                    currPntJson["x"] = currPoint->x;
+                    currPntJson["y"] = currPoint->y;
+                    currShapePts.append(currPntJson);
+                }
+
+                currShape["points"] = currShapePts;
+                pointsJson.append(currShape);
             }
-            currImg["points"] = pointsJson;
+            currImg["shapes"] = pointsJson;
         }
         else
         {
@@ -134,7 +148,7 @@ bool Datfile::DatToJson(string filename)
 bool Datfile::JsonToDat(string filename)
 {
     fs::path jsonfile(filename);
-    fs::path datfile(jsonfile.stem().string() + ".dat");
+    fs::path datfile(jsonfile.stem().string() + "-output.dat");
     
     ifstream imageJson(filename, ifstream::binary);
     Json::Value images;
@@ -191,7 +205,7 @@ bool Datfile::JsonToDat(string filename)
         initOffset.y = img["initialOffset"]["y"].asFloat();
         imgs[i]->initialOffset = initOffset;
 
-        imgs[i]->numShapes = img["points"].size() / 3; // update this once they are grouped in 3's
+        imgs[i]->numShapes = img["shapes"].size();
 
         if (i == 0)
         {
@@ -202,8 +216,7 @@ bool Datfile::JsonToDat(string filename)
             imgs[i]->distFromLen2ToFirstPoint = 64;
         }
 
-        // change to number of shapes * 3 when avail
-        imgs[i]->len = (img["points"].size() * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
+        imgs[i]->len = (img["shapes"].size() * 3 * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
         imgs[i]->len2 = imgs[i]->len - 16;
     }
 
