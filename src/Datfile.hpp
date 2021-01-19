@@ -67,7 +67,7 @@ private:
         uint32_t len;
         Ignore_3 consts_1_0_10;
         uint32_t len2;
-        Ignore_3 consts0_0;
+        Ignore_3 consts0_0; // first value in this can be 0x0 or 0x02 -- appears to be 0x02 when charId = 0x0
         Color color;
         uint32_t charId;
         Ignore_2 consts0_1;

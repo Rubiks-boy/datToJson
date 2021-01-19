@@ -6,7 +6,10 @@ namespace fs = std::filesystem;
 #define add_e(x) x += (uintptr_t)datbuffer_e;
 #define getImAtOffset(im_ptr, offset) (image *)(*(&im_ptr + offset) + (uintptr_t)(datbuffer_e));
 #define SPACING_BETWEEN_POINTS 0x20
-#define VERBOSE_POINTS 0
+#define IMAGE_HEADER_CONST 0x10
+#define VERBOSE_POINTS 1
+
+const int LEN_TO_FIRST_POINT[] = {64, 76, 72, 68};
 
 bool Datfile::convert(string filename)
 {
@@ -23,6 +26,7 @@ bool Datfile::convert(string filename)
     }
 }
 
+// i think our rgba is backwards
 bool Datfile::DatToJson(string filename)
 {
     ifstream inf;
@@ -129,7 +133,81 @@ bool Datfile::DatToJson(string filename)
 
 bool Datfile::JsonToDat(string filename)
 {
-    return false;
+    fs::path jsonfile(filename);
+    fs::path datfile(jsonfile.stem().string() + ".dat");
+    
+    ifstream imageJson(filename, ifstream::binary);
+    Json::Value images;
+    imageJson >> images;
+
+    uint32_t numImgs = images["images"].size();
+
+    Datfile::datfile *df = new Datfile::datfile;
+    df->fileLen = 0; // may be able to calc up front based on num images or just wait until the end
+    df->numImages = numImgs;
+    df->zeros = 0;
+    df->imageOffsets = 16 + ((numImgs -1) * 4);
+
+    image **imgs = new image *[df->numImages];
+    for (uint32_t i = 0; i < df->numImages; ++i)
+    {
+        Json::Value img = images["images"][i];
+
+        imgs[i] = new image;
+
+        Ignore_3 consts1;
+        consts1.const0 = 1;
+        consts1.const1 = 0;
+        consts1.const2 = 16;
+        imgs[i]->consts_1_0_10 = consts1;
+
+        Ignore_3 consts2;
+        consts2.const0 = images["images"][i]["charId"].asInt() != 0 ? 0 : 2;
+        consts2.const1 = 0;
+        consts2.const2 = 0;
+        imgs[i]->consts0_0 = consts2;
+
+        Json::Value jsonColor = img["Color"];
+        Color rgba;
+        rgba.r = jsonColor["red"].asInt();
+        rgba.g = jsonColor["green"].asInt();
+        rgba.b = jsonColor["blue"].asInt();
+        rgba.a = jsonColor["alpha"].asInt();
+        imgs[i]->color = rgba;
+
+        imgs[i]->charId = img["charId"].asInt();
+        imgs[i]->consts0_1 = Ignore_2 { 0, 0 };
+
+        Json::Value jsonScale = img["rotAndScale"];
+        RotAndScale scale;
+        scale.m00 = jsonScale["rotM00"].asFloat();
+        scale.m01 = jsonScale["rotM01"].asFloat();
+        scale.m10 = jsonScale["rotM10"].asFloat();
+        scale.m11 = jsonScale["rotM11"].asFloat();
+        imgs[i]->rotAndScale = scale;
+
+        Point initOffset;
+        initOffset.x = img["initialOffset"]["x"].asFloat();
+        initOffset.y = img["initialOffset"]["y"].asFloat();
+        imgs[i]->initialOffset = initOffset;
+
+        imgs[i]->numShapes = img["points"].size() / 3; // update this once they are grouped in 3's
+
+        if (i == 0)
+        {
+            imgs[i]->distFromLen2ToFirstPoint = LEN_TO_FIRST_POINT[(df->numImages % 4) - 1];
+        }
+        else
+        {
+            imgs[i]->distFromLen2ToFirstPoint = 64;
+        }
+
+        // change to number of shapes * 3 when avail
+        imgs[i]->len = (img["points"].size() * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
+        imgs[i]->len2 = imgs[i]->len - 16;
+    }
+
+    return true;
 }
 
 void Datfile::readBytes(ifstream &inf, char *fbuf, uint32_t filesize)
