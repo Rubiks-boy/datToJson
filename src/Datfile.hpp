@@ -50,10 +50,10 @@ private:
 
     struct Color
     {
-        uint8_t r;
-        uint8_t g;
-        uint8_t b;
         uint8_t a;
+        uint8_t b;
+        uint8_t g;
+        uint8_t r;
     };
 
     struct Point
@@ -67,13 +67,13 @@ private:
         uint32_t len;
         Ignore_3 consts_1_0_10;
         uint32_t len2;
-        Ignore_3 consts0_0;
+        Ignore_3 consts0_0; // first value in this can be 0x0 or 0x02 -- appears to be 0x02 when charId = 0x0
         Color color;
         uint32_t charId;
         Ignore_2 consts0_1;
         RotAndScale rotAndScale;
         Point initialOffset;
-        uint32_t const2;
+        uint32_t numShapes;
         uint32_t distFromLen2ToFirstPoint;
     };
 };

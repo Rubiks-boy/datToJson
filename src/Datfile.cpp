@@ -6,7 +6,10 @@ namespace fs = std::filesystem;
 #define add_e(x) x += (uintptr_t)datbuffer_e;
 #define getImAtOffset(im_ptr, offset) (image *)(*(&im_ptr + offset) + (uintptr_t)(datbuffer_e));
 #define SPACING_BETWEEN_POINTS 0x20
-#define VERBOSE_POINTS 0
+#define IMAGE_HEADER_CONST 0x10
+#define VERBOSE_POINTS 1
+
+const int LEN_TO_FIRST_POINT[] = {0x40, 0x4C, 0x48, 0x44};
 
 bool Datfile::convert(string filename)
 {
@@ -23,6 +26,7 @@ bool Datfile::convert(string filename)
     }
 }
 
+// i think our rgba is backwards
 bool Datfile::DatToJson(string filename)
 {
     ifstream inf;
@@ -87,17 +91,31 @@ bool Datfile::DatToJson(string filename)
             Json::Value pointsJson(Json::arrayValue);
 
             uint32_t numPnts = (imgs[i]->len2 - imgs[i]->distFromLen2ToFirstPoint) / SPACING_BETWEEN_POINTS;
-
-            for (uint32_t j = 0; j < numPnts; ++j)
+            uint32_t numShapes = numPnts / 3;
+            
+            for (uint32_t s = 0; s < numShapes; ++s)
             {
-                Point *currPoint = (Point *)((uintptr_t)pointsPtr + j * SPACING_BETWEEN_POINTS);
-                Json::Value currPntJson;
-                currPntJson["index"] = j;
-                currPntJson["x"] = currPoint->x;
-                currPntJson["y"] = currPoint->y;
-                pointsJson.append(currPntJson);
+                Json::Value currShape;
+                Json::Value currShapePts(Json::arrayValue);
+
+                currShape["index"] = s;
+
+                for (uint32_t j = 0; j < 3; ++j)
+                {
+                    uint32_t ptIndx = (s * 3) + j;
+                    Point *currPoint = (Point *)((uintptr_t)pointsPtr + ptIndx * SPACING_BETWEEN_POINTS);
+                    
+                    Json::Value currPntJson;
+                    currPntJson["index"] = j;
+                    currPntJson["x"] = currPoint->x;
+                    currPntJson["y"] = currPoint->y;
+                    currShapePts.append(currPntJson);
+                }
+
+                currShape["points"] = currShapePts;
+                pointsJson.append(currShape);
             }
-            currImg["points"] = pointsJson;
+            currImg["shapes"] = pointsJson;
         }
         else
         {
@@ -129,7 +147,80 @@ bool Datfile::DatToJson(string filename)
 
 bool Datfile::JsonToDat(string filename)
 {
-    return false;
+    fs::path jsonfile(filename);
+    fs::path datfile(jsonfile.stem().string() + "-output.dat");
+    
+    ifstream imageJson(filename, ifstream::binary);
+    Json::Value images;
+    imageJson >> images;
+
+    uint32_t numImgs = images["images"].size();
+
+    Datfile::datfile *df = new Datfile::datfile;
+    df->fileLen = 0; // may be able to calc up front based on num images or just wait until the end
+    df->numImages = numImgs;
+    df->zeros = 0;
+    df->imageOffsets = 16 + ((numImgs -1) * 4);
+
+    image **imgs = new image *[df->numImages];
+    for (uint32_t i = 0; i < df->numImages; ++i)
+    {
+        Json::Value img = images["images"][i];
+
+        imgs[i] = new image;
+
+        Ignore_3 consts1;
+        consts1.const0 = 1;
+        consts1.const1 = 0;
+        consts1.const2 = 16;
+        imgs[i]->consts_1_0_10 = consts1;
+
+        Ignore_3 consts2;
+        consts2.const0 = images["images"][i]["charId"].asInt() != 0 ? 0 : 2;
+        consts2.const1 = 0;
+        consts2.const2 = 0;
+        imgs[i]->consts0_0 = consts2;
+
+        Json::Value jsonColor = img["Color"];
+        Color rgba;
+        rgba.r = jsonColor["red"].asInt();
+        rgba.g = jsonColor["green"].asInt();
+        rgba.b = jsonColor["blue"].asInt();
+        rgba.a = jsonColor["alpha"].asInt();
+        imgs[i]->color = rgba;
+
+        imgs[i]->charId = img["charId"].asInt();
+        imgs[i]->consts0_1 = Ignore_2 { 0, 0 };
+
+        Json::Value jsonScale = img["rotAndScale"];
+        RotAndScale scale;
+        scale.m00 = jsonScale["rotM00"].asFloat();
+        scale.m01 = jsonScale["rotM01"].asFloat();
+        scale.m10 = jsonScale["rotM10"].asFloat();
+        scale.m11 = jsonScale["rotM11"].asFloat();
+        imgs[i]->rotAndScale = scale;
+
+        Point initOffset;
+        initOffset.x = img["initialOffset"]["x"].asFloat();
+        initOffset.y = img["initialOffset"]["y"].asFloat();
+        imgs[i]->initialOffset = initOffset;
+
+        imgs[i]->numShapes = img["shapes"].size();
+
+        if (i == 0)
+        {
+            imgs[i]->distFromLen2ToFirstPoint = LEN_TO_FIRST_POINT[(df->numImages % 4) - 1];
+        }
+        else
+        {
+            imgs[i]->distFromLen2ToFirstPoint = 64;
+        }
+
+        imgs[i]->len = (img["shapes"].size() * 3 * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
+        imgs[i]->len2 = imgs[i]->len - 16;
+    }
+
+    return true;
 }
 
 void Datfile::readBytes(ifstream &inf, char *fbuf, uint32_t filesize)
