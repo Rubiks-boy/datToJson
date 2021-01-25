@@ -18,6 +18,7 @@ private:
 
     static void readBytes(std::ifstream &inf, char *fbuf, uint32_t filesize);
     static void swapBytes(char *fbuf, uint32_t *fbuf_e, uint32_t filesize);
+    static void swapBytesChar(unsigned char *fbuf, uint32_t filesize);
 
     struct datfile
     {
@@ -40,6 +41,16 @@ private:
         uint32_t const2;
     };
 
+    struct Ignore6
+    {
+        uint32_t i0 = 0;
+        uint32_t i1 = 0;
+        uint32_t i2 = 0;
+        uint32_t i3 = 0;
+        uint32_t i4 = 0;
+        uint32_t i5 = 0;
+    };
+
     struct RotAndScale
     {
         float m00;
@@ -60,6 +71,16 @@ private:
     {
         float x;
         float y;
+    };
+
+    struct Shape
+    {
+        Point pt_a;
+        Ignore6 ignore_a;
+        Point pt_b;
+        Ignore6 ignore_b;
+        Point pt_c;
+        Ignore6 ignore_c;
     };
 
     struct image
