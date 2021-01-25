@@ -1,4 +1,6 @@
 #include "Datfile.hpp"
+#include <stdio.h>
+#include <string.h>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -157,11 +159,13 @@ bool Datfile::JsonToDat(string filename)
     uint32_t numImgs = images["images"].size();
 
     Datfile::datfile *df = new Datfile::datfile;
-    df->fileLen = 0; // may be able to calc up front based on num images or just wait until the end
+    df->fileLen = 0;
     df->numImages = numImgs;
     df->zeros = 0;
-    df->imageOffsets = 16 + ((numImgs -1) * 4);
+    df->imageOffsets = 16 + ((numImgs -1) * 4); // num bytes from 0x0 to length of first image
 
+    uint32_t totalNumShapes = 0;
+    vector<Shape> shapesAllImgs;
     image **imgs = new image *[df->numImages];
     for (uint32_t i = 0; i < df->numImages; ++i)
     {
@@ -181,7 +185,7 @@ bool Datfile::JsonToDat(string filename)
         consts2.const2 = 0;
         imgs[i]->consts0_0 = consts2;
 
-        Json::Value jsonColor = img["Color"];
+        Json::Value jsonColor = img["color"];
         Color rgba;
         rgba.r = jsonColor["red"].asInt();
         rgba.g = jsonColor["green"].asInt();
@@ -205,20 +209,92 @@ bool Datfile::JsonToDat(string filename)
         initOffset.y = img["initialOffset"]["y"].asFloat();
         imgs[i]->initialOffset = initOffset;
 
-        imgs[i]->numShapes = img["shapes"].size();
+        uint32_t numShapes = img["shapes"].size();
+        totalNumShapes += numShapes;
+        imgs[i]->numShapes = numShapes;
 
-        if (i == 0)
+        Shape *shapes = new Shape [numShapes];
+        for (uint32_t j = 0; j < numShapes; ++j)
         {
-            imgs[i]->distFromLen2ToFirstPoint = LEN_TO_FIRST_POINT[(df->numImages % 4) - 1];
+            Json::Value pnts = img["shapes"][j]["points"];
+            
+            if(pnts.size() != 3) {
+                cout << "Shapes must have 3 points. Fix or gtfo." << endl;
+                exit(42069);
+            }
+                
+            shapes[j].pt_a.x = pnts[0]["x"].asFloat();
+            shapes[j].pt_a.y = pnts[0]["y"].asFloat();
+            shapes[j].pt_b.x = pnts[1]["x"].asFloat();
+            shapes[j].pt_b.y = pnts[1]["y"].asFloat();
+            shapes[j].pt_c.x = pnts[2]["x"].asFloat();
+            shapes[j].pt_c.y = pnts[2]["y"].asFloat();
+
+            shapes[j].ignore_a = {0}, shapes[j].ignore_b = {0}, shapes[j].ignore_c = {0};
+            
+            shapesAllImgs.push_back(shapes[j]);
         }
-        else
-        {
-            imgs[i]->distFromLen2ToFirstPoint = 64;
-        }
+
+        imgs[i]->distFromLen2ToFirstPoint = i == 0 ? LEN_TO_FIRST_POINT[(df->numImages % 4) - 1] : imgs[i]->distFromLen2ToFirstPoint = 64;
 
         imgs[i]->len = (img["shapes"].size() * 3 * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
         imgs[i]->len2 = imgs[i]->len - 16;
     }
+
+    shapesAllImgs.resize(totalNumShapes);
+
+    df->fileLen = df->imageOffsets;
+    uint32_t *offsets = new uint32_t [df->numImages];
+    offsets[0] = df->imageOffsets;
+    for (uint32_t k = 0; k < df->numImages; ++k)
+    {
+        df->fileLen += imgs[k]->len;
+
+        if (k != 0) {
+            offsets[k] = offsets[k-1] + imgs[k-1]->len;
+        }
+    }
+
+    unsigned char *datfiledata = new unsigned char [df->fileLen];
+    memset(datfiledata, 0, df->fileLen);
+    unsigned char *dat = datfiledata;
+    *(unsigned int *)dat = df->fileLen;
+    dat += 4;
+    *(unsigned int *)dat = df->numImages;
+    dat += 8; // skip ahead 8 to include zeroes
+    
+    for (uint32_t l = 0; l < df->numImages; l++)
+    {
+        *(unsigned int *)dat = offsets[l];
+        dat += 4;
+    }
+
+    uint32_t shapeIdx = 0;
+    for (uint32_t m = 0; m < df->numImages; m++)
+    {
+        memcpy(dat, imgs[m], sizeof(*imgs[m]));
+        dat += sizeof(*imgs[m]) + imgs[m]->distFromLen2ToFirstPoint - 64; // 64 is min dist from len 2 to first pt
+
+        for (uint32_t s = 0; s < imgs[m]->numShapes; s++)
+        {
+            memcpy(dat, &shapesAllImgs[shapeIdx], sizeof(shapesAllImgs[shapeIdx]));
+            dat += sizeof(shapesAllImgs[shapeIdx]);
+            shapeIdx ++;
+        }
+    }
+
+    swapBytesChar(datfiledata, df->fileLen);
+
+    // string outfname = filename.substr(0, filename.find_last_of(".")) + ".dat";
+    FILE *f = fopen(datfile.c_str(), "wb");
+
+    if (!f)
+    {
+        return false;
+    }
+
+    fwrite(datfiledata, df->fileLen, 1, f);
+    fclose(f);
 
     return true;
 }
@@ -240,4 +316,16 @@ void Datfile::swapBytes(char *fbuf, uint32_t *fbuf_e, uint32_t filesize)
                     ((ui >> 8) & 0x0000FF00) |
                     (ui << 24);
     }
+}
+
+void Datfile::swapBytesChar(unsigned char *fbuf, uint32_t filesize)
+{
+    for (uint32_t i = 0; i + 3 < filesize; i += 4)
+	{
+		uint32_t *ui = (uint32_t *)(fbuf + i);
+		*ui = (*ui >> 24) |
+			  ((*ui << 8) & 0x00FF0000) |
+			  ((*ui >> 8) & 0x0000FF00) |
+			  (*ui << 24);
+	}
 }
