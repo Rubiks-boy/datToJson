@@ -28,7 +28,6 @@ bool Datfile::convert(string filename)
     }
 }
 
-// i think our rgba is backwards
 bool Datfile::DatToJson(string filename)
 {
     ifstream inf;
@@ -64,10 +63,10 @@ bool Datfile::DatToJson(string filename)
         currImg["index"] = i;
 
         Json::Value color;
+        color["alpha"] = imgs[i]->color.a;
         color["red"] = imgs[i]->color.r;
         color["green"] = imgs[i]->color.g;
         color["blue"] = imgs[i]->color.b;
-        color["alpha"] = imgs[i]->color.a;
         currImg["color"] = color;
 
         currImg["charId"] = imgs[i]->charId;
@@ -185,10 +184,10 @@ bool Datfile::JsonToDat(string filename)
 
         Json::Value jsonColor = img["color"];
         Color rgba;
+        rgba.a = jsonColor["alpha"].asInt();
         rgba.r = jsonColor["red"].asInt();
         rgba.g = jsonColor["green"].asInt();
         rgba.b = jsonColor["blue"].asInt();
-        rgba.a = jsonColor["alpha"].asInt();
         imgs[i]->color = rgba;
 
         imgs[i]->charId = img["charId"].asInt();
