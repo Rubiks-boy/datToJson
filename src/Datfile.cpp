@@ -84,8 +84,6 @@ bool Datfile::DatToJson(string filename)
         offset["y"] = imgs[i]->initialOffset.y;
         currImg["initialOffset"] = offset;
 
-        currImg["twiceDistBetPnts"] = imgs[i]->distFromLen2ToFirstPoint;
-
         uint32_t *pointsPtr = (uint32_t *)((uint64_t)(&imgs[i]->len2) + imgs[i]->distFromLen2ToFirstPoint);
 
         if (VERBOSE_POINTS)
