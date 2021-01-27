@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 #define IMAGE_HEADER_CONST 0x10
 #define VERBOSE_POINTS 1
 
-const int LEN_TO_FIRST_POINT[] = {0x40, 0x4C, 0x48, 0x44};
+const int LEN_TO_FIRST_POINT[] = {0x44, 0x40, 0x4C, 0x48};
 
 bool Datfile::convert(string filename)
 {
@@ -232,7 +232,7 @@ bool Datfile::JsonToDat(string filename)
             shapesAllImgs.push_back(shapes[j]);
         }
 
-        imgs[i]->distFromLen2ToFirstPoint = i == 0 ? LEN_TO_FIRST_POINT[(df->numImages % 4) - 1] : imgs[i]->distFromLen2ToFirstPoint = 64;
+        imgs[i]->distFromLen2ToFirstPoint = i == 0 ? LEN_TO_FIRST_POINT[df->numImages % 4] : 64;
 
         imgs[i]->len = (img["shapes"].size() * 3 * SPACING_BETWEEN_POINTS) + IMAGE_HEADER_CONST + imgs[i]->distFromLen2ToFirstPoint;
         imgs[i]->len2 = imgs[i]->len - 16;
@@ -282,7 +282,6 @@ bool Datfile::JsonToDat(string filename)
 
     swapBytesChar(datfiledata, df->fileLen);
 
-    // string outfname = filename.substr(0, filename.find_last_of(".")) + ".dat";
     FILE *f = fopen(datfile.c_str(), "wb");
 
     if (!f)
